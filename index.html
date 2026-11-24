@@ -104,7 +104,7 @@
   <script>
   (()=>{'use strict';
     const KEY='khtn6-mass-lab-v3',CFGKEY='khtn6-mass-lab-config-v3',SNDKEY='khtn6-mass-lab-sound';
-    const SHEETS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbzHlriCCug_r02Oxzlnsy4kLG-Dcj6sZ_dUVUvIBXofy6TGxC2v30Eumwc8XwmT5rGW/exec';
+    const SHEETS_WEB_APP_URL='https://script.google.com/macros/s/AKfycbzWrpkE_-P9MgEqI7Hf7wYCyZb6xP0a4XdLNLoZYPdgTb1nqmzmMTohGE5cKzd_GcZm/exec';
     const $=id=>document.getElementById(id), esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const get=(key)=>{try{return localStorage.getItem(key)}catch{return null}},set=(key,val)=>{try{localStorage.setItem(key,val);return true}catch{return false}};
     function makeSessionId(){return (globalThis.crypto&&crypto.randomUUID)?crypto.randomUUID():'s-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12)}
