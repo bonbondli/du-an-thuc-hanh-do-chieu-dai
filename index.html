@@ -92,55 +92,19 @@ if(!s.sessionId)s.sessionId=(crypto.randomUUID?crypto.randomUUID():('s-'+Date.no
 if(!('startedAt' in s))s.startedAt=s.createdAt||now();
 if(!s.quiz||!Array.isArray(s.quiz.order)||s.quiz.order.length!==MEASURE_STEPS.length)s.quiz=reviewBlank();
 if(!s.reflection)s.reflection={action:'',observation:'',lesson:''};
+if(!Array.isArray(s.events))s.events=[];
 if(!s.toolReasonNotes)s.toolReasonNotes={};if(!s.toolChoices)s.toolChoices={};
 let sound=storage.getItem(SOUND)==='1',audio,canPersist=true;
 function sheetsPayload(){
  const rulerName=id=>{const r=RULERS.find(x=>x.id===s.tools[id]);return r?r.name:''};
- const quiz=s.quiz||{};
- const result=quiz.lastResult||{};
- const maxScore=5;
- return {
-  appType:'KHTN6_DO_KICH_THUOC_SACH',
-  sessionId:s.sessionId,
-  name:s.alias,
-  studentClass:s.className,
-  classCode:s.classCode,
-  className:s.assignment?.className||cfg.className,
-  step:s.step,
-  status:s.step==='done'?'completed':'in_progress',
-  startedAt:s.startedAt||s.createdAt||'',
-  finishedAt:s.finishedAt||'',
-  updatedAt:now(),
-  score:Number(result.correctCount||0),
-  maxScore,
-  quizOrderCorrect:!!result.orderCorrect,
-  predict:s.predict,
-  tools:s.tools,
-  toolReason:s.toolReason,
-  toolChoices:s.toolChoices,
-  trials:s.trials,
-  means:s.means,
-  answer:s.answer,
-  conclusion:s.conclusion,
-  reflection:s.reflection,
-  knowledgeCheck:quiz,
-  question:s.question,
-  firstSubmission:s.firstSubmission,
-  issuesSeen:s.issuesSeen,
-  reviewCount:s.reviewCount,
-  events:s.events||[],
-  rulerNames:{length:rulerName('length'),thickness:rulerName('thickness')}
- };
+ const trial=(id,i)=>s.trials?.[id]?.[i]||{};
+ return {appType:'KHTN6_DO_KICH_THUOC_SACH',sessionId:s.sessionId,name:s.alias,classCode:s.classCode,className:s.className||cfg.className,step:s.step,status:s.step==='done'?'completed':'in_progress',startedAt:s.startedAt||s.createdAt||'',finishedAt:s.finishedAt||'',updatedAt:now(),predict:s.predict,tools:s.tools,toolReason:s.toolReason,toolChoices:s.toolChoices,trials:s.trials,means:s.means,answer:s.answer,conclusion:s.conclusion,reflection:s.reflection,knowledgeCheck:s.quiz,question:s.question,firstSubmission:s.firstSubmission,issuesSeen:s.issuesSeen,reviewCount:s.reviewCount,events:s.events||[],rulerNames:{length:rulerName('length'),thickness:rulerName('thickness')}};
 }
 function syncToSheets(){
- if(!SHEETS_URL||!s.alias||!s.classCode)return;
- const payload=sheetsPayload();
- try{
-  fetch(SHEETS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),keepalive:true})
-   .then(()=>{ /* no-cors response is opaque; server acceptance cannot be confirmed here */ })
-   .catch(()=>{ console.warn('KHTN6: chưa gửi được yêu cầu đồng bộ; dữ liệu vẫn được lưu trên thiết bị.'); });
- }catch(e){console.warn('KHTN6: lỗi gửi dữ liệu; dữ liệu vẫn được lưu trên thiết bị.',e)}
+ if(!SHEETS_URL||SHEETS_URL==='DAN_URL_APPS_SCRIPT_WEB_APP_VAO_DAY'||!s.alias||!s.classCode)return;
+ try{fetch(SHEETS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(sheetsPayload()),keepalive:true}).catch(()=>{});}catch(e){}
 }
+function save(){canPersist=storage.setItem(KEY,JSON.stringify(s));syncToSheets();return canPersist}
 function message(t){const a=E('error');if(a){a.textContent=t;a.scrollIntoView({behavior:'smooth',block:'nearest'})}}
 function beep(type){if(!sound)return;try{audio=audio||new (AudioContext||webkitAudioContext)();const notes=type==='check'?[392]:type==='ready'?[523,659]:[460];notes.forEach((hz,i)=>{let o=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime+i*.12;o.type='sine';o.frequency.value=hz;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.037,t+.025);g.gain.exponentialRampToValueAtTime(.0001,t+.14);o.connect(g).connect(audio.destination);o.start(t);o.stop(t+.15)})}catch{}}
 function go(step){s.step=step;save();render();window.scrollTo({top:0,behavior:'smooth'})}
@@ -268,7 +232,7 @@ function conclude(){
 function filePart(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,c=>c==='đ'?'d':'D').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'')||'hoc_sinh'}
 function download(name,content,type){let url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function done(){let report=DIMS.map(d=>`<h3>${esc(d.title)}</h3>${s.toolChoices?.[d.id]?.ghd?`<p><strong>Em đọc thông số:</strong> GHĐ ${fmt(s.toolChoices[d.id].ghd)} cm · ĐCNN ${fmt(s.toolChoices[d.id].dcnn*10)} mm.<br><strong>Lí do:</strong> ${esc(s.toolReason[d.id]||'–')}</p>`:''}<div class="table-wrap"><table class="data"><tr><th>Lần</th><th>Thước</th><th>Số đo</th><th>Thao tác</th></tr>${s.trials[d.id].map((t,i)=>`<tr><td>${i+1}</td><td>${esc(ruler(d).name)}</td><td>${esc(t.number)} ${esc(t.unit)}</td><td>Vạch 0: ${fmt(t.offset)} cm · nghiêng ${t.tilt}° · mắt ${t.eye==='direct'?'vuông góc':'nghiêng'}</td></tr>`).join('')}<tr><th colspan="2">Trung bình em ghi</th><th colspan="2">${esc(s.means[d.id])} cm</th></tr></table></div>`).join('');shell(`Phiếu thực hành của ${s.alias}`, 'Em đã hoàn thành luyện tập trên mô hình. Hãy chuẩn bị quyển SGK và thước thật cho buổi thực hành.',`<div class="info good"><strong>Đã lưu bài trong trình duyệt này.</strong> APP đã lưu bài trên thiết bị và thử gửi dữ liệu khi có mạng. Em hãy tải phiếu dự phòng; giáo viên kiểm tra bảng theo dõi để xác nhận đã nhận bài.</div><div class="summary-bubble"><strong>HỌ VÀ TÊN: ${esc(s.alias)} · LỚP: ${esc(s.className||cfg.className)}</strong><br><strong>Vấn đề ban đầu:</strong> ${esc(cfg.intro)}<br><strong>Vận dụng:</strong> ${esc(cfg.apply)}</div><p><strong>Dự đoán:</strong> chiều dài ${esc(s.predict.length)} cm; độ dày ${esc(s.predict.thickness)} cm.</p>${report}${s.quiz?.firstResult?`<h3>Kiểm tra sau thực hành</h3><p><strong>Lần đầu:</strong> Sắp xếp ${s.quiz.firstResult.orderCorrect?'đúng':'cần xem lại'}; trả lời đúng ${s.quiz.firstResult.correctCount}/5 câu. <strong>Lần gần nhất:</strong> ${s.quiz.lastResult.correctCount}/5 câu. Tổng số lượt: ${s.quiz.attempts}.</p><div class="table-wrap"><table class="data"><tr><th>Câu</th><th>Mức độ</th><th>Đáp án em chọn lần đầu</th><th>Kết quả</th></tr>${QUIZ_ITEMS.map((q,i)=>`<tr><td>${i+1}</td><td>${esc(q.level)}</td><td>${esc(q.options[s.quiz.firstResult.answers[i]])}</td><td>${s.quiz.firstResult.answers[i]===q.correct?'Đúng':'Cần xem lại'}</td></tr>`).join('')}</table></div>`:''}<h3>Nhận xét và kết luận của em</h3><p>${esc(s.answer)}</p><div class="reflection-report">${esc(s.conclusion)}</div>${s.question?`<div class="info warn"><strong>Điều cần giáo viên hỗ trợ:</strong> ${esc(s.question)}</div>`:''}<div class="info"><strong>Thẻ chuẩn bị đo thật</strong><br>Chọn thước đủ GHĐ và có ĐCNN phù hợp → đặt vạch 0 tại đầu vật → đặt dọc cạnh đo → nhìn vuông góc → đọc và ghi số với đơn vị → đo 3 lần.</div><div class="actions no-print"><button id="print" class="btn primary">In / lưu PDF phiếu</button><button id="json" class="btn secondary">Tải dữ liệu quá trình (.json)</button><button id="restart" class="btn">Bắt đầu lượt mới</button></div><p class="notice">${esc(cfg.submit)} APP thử gửi lịch sử thao tác khi có mạng nhưng không xác nhận được việc tiếp nhận. Em hãy tải tệp JSON hoặc phiếu PDF để nộp dự phòng.</p>`,'HOÀN THÀNH');E('print').onclick=()=>window.print();E('json').onclick=()=>download('phieu-do-sach-'+filePart(s.className||cfg.className)+'-'+filePart(s.alias)+'.json',JSON.stringify({format:'KHTN6_book_lab_v2',mode:'device-local',...s,name:s.alias},null,2),'application/json;charset=utf-8');E('restart').onclick=()=>{if(confirm('Bắt đầu lượt mới? Hãy tải phiếu lượt này nếu em muốn giữ kết quả.')){s=blank();go('intro')}}}
-E('rulerCloseTop').onclick=E('rulerClose').onclick=()=>E('rulerDialog').close();E('teacherBtn').onclick=openTeacher;E('closeTeacher').onclick=()=>E('teacherDialog').close();E('saveTeacher').onclick=saveTeacher;E('exportTeacher').onclick=()=>{if(!cfg.pinHash)return E('teacherError').textContent='Hãy lưu cài đặt và đặt mã quản lí trước khi tải tệp cấu hình.';download('cau-hinh-lop-'+cfg.classCode+'.json',JSON.stringify(cfg,null,2),'application/json;charset=utf-8')};E('helpBtn').onclick=()=>E('helpDialog').showModal();E('soundBtn').onclick=()=>{sound=!sound;storage.setItem(SOUND,sound?'1':'0');E('soundBtn').innerHTML=sound?'♫ <span>Tắt âm</span>':'♫ <span>Bật âm</span>';E('soundBtn').setAttribute('aria-pressed',String(sound));if(sound)beep('saved')};E('saveBtn').onclick=()=>{if(save())alert('Đã lưu trên thiết bị này. Khi mở lại cùng trình duyệt, em sẽ tiếp tục đúng màn đang làm. Bài chưa được gửi cho giáo viên.');else alert('Trình duyệt hiện không cho lưu tiến trình của tệp này. Em vẫn có thể làm bài trong phiên đang mở, nhưng không nên đóng trang trước khi hoàn thành và tải phiếu.')};if(sound){E('soundBtn').innerHTML='♫ <span>Tắt âm</span>';E('soundBtn').setAttribute('aria-pressed','true')}syncToSheets();render();
+E('rulerCloseTop').onclick=E('rulerClose').onclick=()=>E('rulerDialog').close();E('teacherBtn').onclick=openTeacher;E('closeTeacher').onclick=()=>E('teacherDialog').close();E('saveTeacher').onclick=saveTeacher;E('exportTeacher').onclick=()=>{if(!cfg.pinHash)return E('teacherError').textContent='Hãy lưu cài đặt và đặt mã quản lí trước khi tải tệp cấu hình.';download('cau-hinh-lop-'+cfg.classCode+'.json',JSON.stringify(cfg,null,2),'application/json;charset=utf-8')};E('helpBtn').onclick=()=>E('helpDialog').showModal();E('soundBtn').onclick=()=>{sound=!sound;storage.setItem(SOUND,sound?'1':'0');E('soundBtn').innerHTML=sound?'♫ <span>Tắt âm</span>':'♫ <span>Bật âm</span>';E('soundBtn').setAttribute('aria-pressed',String(sound));if(sound)beep('saved')};E('saveBtn').onclick=()=>{if(save())alert('Đã lưu trên thiết bị này. Khi mở lại cùng trình duyệt, em sẽ tiếp tục đúng màn đang làm. Bài chưa được gửi cho giáo viên.');else alert('Trình duyệt hiện không cho lưu tiến trình của tệp này. Em vẫn có thể làm bài trong phiên đang mở, nhưng không nên đóng trang trước khi hoàn thành và tải phiếu.')};if(sound){E('soundBtn').innerHTML='♫ <span>Tắt âm</span>';E('soundBtn').setAttribute('aria-pressed','true')}render();
 })();
 </script></body>
 </html>
